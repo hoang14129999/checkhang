@@ -89,17 +89,19 @@ app.post('/checkhang', (req, res) => {
 });
 
 // Xóa sản phẩm theo thời gian tạo
+// Xóa sản phẩm theo thời gian tạo
 app.delete('/checkhang/:thoigiantao', (req, res) => {
   const thoigiantaoLocal = decodeURIComponent(req.params.thoigiantao); // Ví dụ: "2025-07-09 11:08:00"
 
-  // Chuyển từ giờ Việt Nam (UTC+7) sang UTC
+  // 🪵 Ghi log để debug thời gian gửi từ frontend và thời gian chuyển về UTC
+  console.log('🕒 Local (from frontend):', thoigiantaoLocal);
+
   const localDate = new Date(thoigiantaoLocal);
   const utcDate = new Date(localDate.getTime() - 7 * 60 * 60 * 1000); // Trừ 7 tiếng
 
-  // Format về dạng MySQL DATETIME: "YYYY-MM-DD HH:mm:ss"
-  const formattedUTC = utcDate.toISOString().slice(0, 19).replace('T', ' '); // Ví dụ: "2025-07-09 04:08:00"
+  const formattedUTC = utcDate.toISOString().slice(0, 19).replace('T', ' ');
+  console.log('🕒 UTC (converted for DB):', formattedUTC);
 
-  // Truy vấn xóa (sử dụng LIKE để bỏ qua giây nếu không cần)
   const query = `DELETE FROM checkhang WHERE Thoigiantao LIKE ? LIMIT 1`;
   db.query(query, [`${formattedUTC}%`], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -111,6 +113,7 @@ app.delete('/checkhang/:thoigiantao', (req, res) => {
     }
   });
 });
+
 
 
 // Lấy danh sách sản phẩm kèm tên tài khoản
