@@ -90,13 +90,28 @@ app.post('/checkhang', (req, res) => {
 
 // Xóa sản phẩm theo thời gian tạo
 app.delete('/checkhang/:thoigiantao', (req, res) => {
-  const thoigiantao = decodeURIComponent(req.params.thoigiantao);
-  const query = `DELETE FROM checkhang WHERE Thoigiantao = ?`;
-  db.query(query, [thoigiantao], (err, result) => {
+  const thoigiantaoLocal = decodeURIComponent(req.params.thoigiantao); // Ví dụ: "2025-07-09 11:08:00"
+
+  // Chuyển từ giờ Việt Nam (UTC+7) sang UTC
+  const localDate = new Date(thoigiantaoLocal);
+  const utcDate = new Date(localDate.getTime() - 7 * 60 * 60 * 1000); // Trừ 7 tiếng
+
+  // Format về dạng MySQL DATETIME: "YYYY-MM-DD HH:mm:ss"
+  const formattedUTC = utcDate.toISOString().slice(0, 19).replace('T', ' '); // Ví dụ: "2025-07-09 04:08:00"
+
+  // Truy vấn xóa (sử dụng LIKE để bỏ qua giây nếu không cần)
+  const query = `DELETE FROM checkhang WHERE Thoigiantao LIKE ? LIMIT 1`;
+  db.query(query, [`${formattedUTC}%`], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Đã xóa thành công' });
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Đã xóa thành công' });
+    } else {
+      res.status(404).json({ message: 'Không tìm thấy sản phẩm với thời gian đã cho' });
+    }
   });
 });
+
 
 // Lấy danh sách sản phẩm kèm tên tài khoản
 app.get('/showhang/:id', (req, res) => {
