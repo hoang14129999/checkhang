@@ -15,7 +15,8 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT // thêm dòng này nếu Railway dùng port khác (24856)
 });
 
 db.connect((err) => {
