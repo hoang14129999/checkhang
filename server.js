@@ -20,7 +20,25 @@ app.get('/nguoidung', async (req, res) => {
     res.status(500).json({ error: 'Kết nối DB lỗi hoặc Railway chưa khởi động xong.' });
   }
 });
+// ✅ Lấy toàn bộ dữ liệu từ bảng checkhang
+app.get('/checkhanghoa', async (req, res) => {
+  const query = 'SELECT * FROM checkhang ORDER BY Thoigiantao DESC';
+  try {
+    const results = await db.query(query);
 
+    // Chuyển Thoigiantao về giờ local
+    const localResults = results.map(row => {
+      const date = new Date(row.Thoigiantao);
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      row.Thoigiantao = local.toISOString().slice(0, 19).replace('T', ' ');
+      return row;
+    });
+
+    res.json(localResults);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // ✅ Đăng nhập
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
