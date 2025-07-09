@@ -28,11 +28,16 @@ db.connect((err) => {
 });
 
 // Lấy danh sách người dùng
-app.get('/nguoidung', (req, res) => {
-  db.query('SELECT * FROM nguoidung', (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
-  });
+app.get('/nguoidung', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM nguoidung');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('DB lỗi: ', err.message);
+
+    // thử reset lại pool nếu cần
+    res.status(500).json({ error: 'Kết nối DB lỗi hoặc Railway chưa khởi động xong.' });
+  }
 });
  
 
