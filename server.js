@@ -34,6 +34,8 @@ app.get('/nguoidung', (req, res) => {
     res.json(results);
   });
 });
+ 
+
 
 // Đăng nhập
 app.post('/login', (req, res) => {
