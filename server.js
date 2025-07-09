@@ -1,9 +1,8 @@
-// ✅ FILE: server.js (Express backend server ready for deployment)
-require('dotenv').config(); // Nạp biến môi trường từ .env
-
+// ✅ FILE: server.js (Express backend server ready for Railway)
+require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2');
 const cors = require('cors');
+const db = require('./db'); // ✅ Import pool
 
 const app = express();
 const PORT = process.env.PORT || 5173;
@@ -11,43 +10,23 @@ const PORT = process.env.PORT || 5173;
 app.use(cors());
 app.use(express.json());
 
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT // thêm dòng này nếu Railway dùng port khác (24856)
-});
-
-db.connect((err) => {
-  if (err) {
-    console.error('❌ Kết nối MySQL thất bại:', err.message);
-  } else {
-    console.log('✅ Kết nối MySQL thành công');
-  }
-});
-
-// Lấy danh sách người dùng
+// ✅ Lấy danh sách người dùng
 app.get('/nguoidung', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM nguoidung');
-    res.json(result.rows);
+    const result = await db.query('SELECT * FROM nguoidung');
+    res.json(result);
   } catch (err) {
-    console.error('DB lỗi: ', err.message);
-
-    // thử reset lại pool nếu cần
+    console.error('❌ DB lỗi:', err.message);
     res.status(500).json({ error: 'Kết nối DB lỗi hoặc Railway chưa khởi động xong.' });
   }
 });
- 
 
-
-// Đăng nhập
-app.post('/login', (req, res) => {
+// ✅ Đăng nhập
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   const query = 'SELECT * FROM nguoidung WHERE tentaikhoan = ? AND matkhau = ?';
-  db.query(query, [username, password], (err, results) => {
-    if (err) return res.status(500).json({ error: 'Lỗi truy vấn CSDL' });
+  try {
+    const results = await db.query(query, [username, password]);
     if (results.length > 0) {
       res.json({
         success: true,
@@ -60,63 +39,63 @@ app.post('/login', (req, res) => {
     } else {
       res.status(401).json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
     }
-  });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi truy vấn CSDL' });
+  }
 });
 
-// Lấy sản phẩm theo người dùng
-app.get('/checkhang-user/:id', (req, res) => {
+// ✅ Lấy sản phẩm theo người dùng
+app.get('/checkhang-user/:id', async (req, res) => {
   const userId = req.params.id;
   const query = 'SELECT * FROM checkhang WHERE id_nguoidung = ? ORDER BY Thoigiantao DESC';
-  db.query(query, [userId], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-
-    // ✅ Chuyển Thoigiantao từ UTC về local time
+  try {
+    const results = await db.query(query, [userId]);
     const localResults = results.map(row => {
       const date = new Date(row.Thoigiantao);
       const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
       row.Thoigiantao = local.toISOString().slice(0, 19).replace('T', ' ');
       return row;
     });
-
     res.json(localResults);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Thêm sản phẩm mới
-app.post('/checkhang', (req, res) => {
+// ✅ Thêm sản phẩm mới
+app.post('/checkhang', async (req, res) => {
   const { Thoigiantao, Tensp, NSX, HSD, Songayhethan, Songaysanxuat, Luuy, id_nguoidung } = req.body;
   const query = `
     INSERT INTO checkhang (Thoigiantao, Tensp, NSX, HSD, Songayhethan, Songaysanxuat, Luuy, id_nguoidung)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  db.query(query, [Thoigiantao, Tensp, NSX, HSD, Songayhethan, Songaysanxuat, Luuy, id_nguoidung], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const result = await db.query(query, [Thoigiantao, Tensp, NSX, HSD, Songayhethan, Songaysanxuat, Luuy, id_nguoidung]);
     res.json({ message: 'Thêm thành công', id: result.insertId });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Xóa sản phẩm theo thời gian tạo
-app.delete('/checkhang/:thoigiantao', (req, res) => {
-  const thoigiantaoLocal = decodeURIComponent(req.params.thoigiantao); // "2025-07-08 21:57:00"
-  console.log('🕒 Thời gian từ frontend:', thoigiantaoLocal);
-
-  // ✅ Không trừ gì nữa
+// ✅ Xoá sản phẩm theo thời gian tạo
+app.delete('/checkhang/:thoigiantao', async (req, res) => {
+  const thoigiantaoLocal = decodeURIComponent(req.params.thoigiantao);
   const formattedUTC = new Date(thoigiantaoLocal).toISOString().slice(0, 19).replace('T', ' ');
-  console.log('🔍 Thời gian chuẩn để xoá trong DB:', formattedUTC);
-
   const query = `DELETE FROM checkhang WHERE Thoigiantao LIKE ? LIMIT 1`;
-  db.query(query, [`${formattedUTC}%`], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-
+  try {
+    const result = await db.query(query, [`${formattedUTC}%`]);
     if (result.affectedRows > 0) {
       res.json({ message: 'Đã xóa thành công' });
     } else {
       res.status(404).json({ message: 'Không tìm thấy sản phẩm với thời gian đã cho' });
     }
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
-// Lấy danh sách sản phẩm kèm tên tài khoản
-app.get('/showhang/:id', (req, res) => {
+
+// ✅ Lấy danh sách sản phẩm kèm tên tài khoản
+app.get('/showhang/:id', async (req, res) => {
   const idNguoiDung = req.params.id;
   const query = `
     SELECT ch.*, nd.tentaikhoan
@@ -125,10 +104,12 @@ app.get('/showhang/:id', (req, res) => {
     WHERE ch.id_nguoidung = ?
     ORDER BY ch.Thoigiantao DESC
   `;
-  db.query(query, [idNguoiDung], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const results = await db.query(query, [idNguoiDung]);
     res.json(results);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
